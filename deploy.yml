@@ -8,10 +8,9 @@
     yum:
       name: ['httpd', 'mod_ssl']
       state: latest
-    tags:
-      - predeploy
-      - deploy
-  
+    notify: 
+      restart httpd
+    
   - name: Create app directory
     file:
       state: directory
@@ -22,23 +21,23 @@
     with_items:
       - /etc/ssl/private/
       - /var/www/html
-    tags:
-      - predeploy
-      - deploy
   
   - name: "Generate the private key file to sign the CSR"
     openssl_privatekey:
       path: /etc/ssl/private/apache-selfsigned.key
-      size: 2048 
+      size: 2048
+    
   - name: "Generate the CSR file signed with the private key"
     openssl_csr:
       path: /etc/ssl/private/apache-selfsigned.csr
       privatekey_path: /etc/ssl/private/apache-selfsigned.key
+    
   - openssl_certificate:
       provider: selfsigned
       path: /etc/ssl/private/apache-selfsigned.crt
       privatekey_path: /etc/ssl/private/apache-selfsigned.key
       csr_path: /etc/ssl/private/apache-selfsigned.csr
+    
   - name: Copy files 
     copy:
       src: /home/ec2-user/web/
@@ -57,21 +56,11 @@
     loop:
       - {"src": "virtualhost", "dest": "{{ ip }}" }
       - {"src": "ssl", "dest": "ssl" }
-
-  # - name: enable Apache SSL module
-  #   command: >
-  #     a2enmod ssl
-  #     creates=/etc/apache2/mods-enabled/ssl.load
-    
-  # - name: enabled mod_rewrite
-  #   apache2_module: 
-  #     name: rewrite
-  #     state: present
-  #   notify:
-  #     - restart apache2
+    notify: 
+      restart httpd
 
   handlers:
-    - name: restart apache2
+    - name: restart httpd
       service: 
-        name: apache2 
+        name: httpd 
         state: restarted
